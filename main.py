@@ -61,11 +61,15 @@ def webhook_handler():
             data = request.get_json()
 
             if data['action']['data']['card']['idList'] in (list_creo, list_tech):
+                print('step1')
                 if data['action']['data']['listBefore']['id'] in (list_from_creo, list_from_tech):
+                    print('step2')
                     card_id = data['action']['data']['card']['id']
                     if data['action']['data']['card']['idList'] == list_tech:
                         get_card(card_id, "cards_tech")
+                        print('step3.1')
                     else:
+                        print('step3.2')
                         get_card(card_id, "cards_creo")
 
         except Exception as e:
