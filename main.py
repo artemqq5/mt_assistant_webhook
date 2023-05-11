@@ -44,7 +44,7 @@ def webhook_handler():
             data = request.get_json()
 
             if data['action']['data']['card']['idList'] in (list_creo, list_tech):
-                if data['action']['display']['entities']['listBefore'] in (list_from_creo, list_from_tech):
+                if data['action']['data']['listBefore']['id'] in (list_from_creo, list_from_tech):
                     card_id = data['action']['data']['card']['id']
                     get_card(card_id)
 
