@@ -78,22 +78,15 @@ def webhook_handler():
 
 
 def get_card(id_card, table_name):
-    # jsonDataPass = {
-    #     "chat_id": "6002568864",
-    #     "text": f"{'card_label'} | {'card_id'}"
-    # }
     card = clientTrelloApi.get_card(id_card)
     result = get_card_from_db(table_name, id_card)
     if result is not None:
-        print(result)
-
-        print(card.name)
-        print(card.url)
-
-        print(card.id)
-
-    # result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
-    # print(result)
+        jsonDataPass = {
+            "chat_id": result,
+            "text": f"{card.name} - Задача готова✅ \n{card.url}"
+        }
+        result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
+        print(result.status_code)
 
 
 def get_card_from_db(table_name, id_card):
@@ -103,7 +96,7 @@ def get_card_from_db(table_name, id_card):
                 select_card = f"SELECT `id_user` FROM `{table_name}` WHERE `id_card` = '{id_card}';"
 
                 cursor.execute(select_card)
-                result = cursor.fetchall()[0]
+                result = cursor.fetchall()[0]['id_user']
 
             connection.commit()
             return result
