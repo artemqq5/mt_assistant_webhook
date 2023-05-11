@@ -27,10 +27,10 @@ def webhook_handler():
             data = request.get_json()
             print(data)
 
-            if data['action']['data']['card']['idList'] == list_creo:
-                print('creative')
-            elif data['action']['data']['card']['idList'] == list_tech:
-                print('tech')
+            # if data['action']['data']['card']['idList'] == list_creo:
+            #     print('creative')
+            # elif data['action']['data']['card']['idList'] == list_tech:
+            #     print('tech')
 
             card_label = data['action']['data']['card']['name']
             card_id = data['action']['data']['card']['id']
@@ -39,11 +39,9 @@ def webhook_handler():
                 "chat_id": "6002568864",
                 "text": f"{card_label} | {card_id}"
             }
-            headers = {
-                "Content-Type": "application/json"
-            }
-            result = requests.post(URL_MESSAGE, json.dumps(jsonDataPass), headers)
-            print(result.status_code)
+
+            result = requests.request(URL_MESSAGE, jsonDataPass)
+            print(result)
 
             print(card_label)
             print(card_id)
