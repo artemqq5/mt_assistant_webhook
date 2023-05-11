@@ -23,18 +23,25 @@ else:
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook_handler():
     if request.method == 'POST':
-        data = request.get_json()
+        try:
+            data = request.get_json()
 
-    # data_message = {
-    #     "chat_id": chat_id,
-    #     "text": text
-    # }
-    # requests.request('POST', URL_MESSAGE, data_message)
+            if data['action']['data']['card']['idList'] == list_creo:
+                print('creative')
+            elif data['action']['data']['card']['idList'] == list_tech:
+                print('tech')
 
+            card_label = data['action']['data']['card']['name']
+            card_id = data['action']['data']['card']['id']
+
+            print(card_label)
+            print(card_id)
+        except Exception as e:
+            print("exception when getting data POST")
+            print(f"exception {e}")
     else:
-        data = "get request success"
+        print("get request success GET")
 
-    print(data)
     return 'OK', 200
 
 
