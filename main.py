@@ -8,7 +8,7 @@ from private_config import local_telegram_token, server_telegram_token, list_tec
 
 app = Flask(__name__)
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 if DEBUG_MODE:
     URL_MESSAGE = f"https://api.telegram.org/bot{local_telegram_token}/sendMessage"
@@ -38,8 +38,10 @@ def webhook_handler():
                 "chat_id": "6002568864",
                 "text": f"{card_label} | {card_id}"
             }
-
-            result = requests.request(URL_MESSAGE, jsonDataPass)
+            headers = {
+                "Content-Type": "application/json"
+            }
+            result = requests.post(URL_MESSAGE, json.dumps(jsonDataPass), headers)
             print(result.status_code)
 
             print(card_label)
