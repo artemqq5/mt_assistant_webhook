@@ -11,7 +11,7 @@ from private_config import local_telegram_token, server_telegram_token, list_tec
 
 app = Flask(__name__)
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 if DEBUG_MODE:
     URL_MESSAGE = f"https://api.telegram.org/bot{local_telegram_token}/sendMessage"
