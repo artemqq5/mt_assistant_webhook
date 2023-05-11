@@ -25,6 +25,7 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.get_json()
+            print(data)
 
             if data['action']['data']['card']['idList'] == list_creo:
                 print('creative')
