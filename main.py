@@ -1,7 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 import requests
-import json
 
 from private_config import local_telegram_token, server_telegram_token, list_tech_done_local, list_creo_done_local, \
     list_tech_done, list_creo_done
@@ -27,10 +26,10 @@ def webhook_handler():
             data = request.get_json()
             print(data)
 
-            # if data['action']['data']['card']['idList'] == list_creo:
-            #     print('creative')
-            # elif data['action']['data']['card']['idList'] == list_tech:
-            #     print('tech')
+            if data['action']['data']['card']['idList'] == list_creo:
+                print('creative')
+            elif data['action']['data']['card']['idList'] == list_tech:
+                print('tech')
 
             card_label = data['action']['data']['card']['name']
             card_id = data['action']['data']['card']['id']
@@ -40,7 +39,7 @@ def webhook_handler():
                 "text": f"{card_label} | {card_id}"
             }
 
-            result = requests.request(URL_MESSAGE, jsonDataPass)
+            result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
             print(result)
 
             print(card_label)
