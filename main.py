@@ -34,6 +34,14 @@ def webhook_handler():
             card_label = data['action']['data']['card']['name']
             card_id = data['action']['data']['card']['id']
 
+            jsonDataPass = {
+                "chat_id": "6002568864",
+                "text": f"{card_label} | {card_id}"
+            }
+
+            result = requests.request(URL_MESSAGE, jsonDataPass)
+            print(result.status_code)
+
             print(card_label)
             print(card_id)
         except Exception as e:
