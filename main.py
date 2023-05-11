@@ -62,8 +62,10 @@ def get_card(id_card):
     #     "chat_id": "6002568864",
     #     "text": f"{'card_label'} | {'card_id'}"
     # }
-
-    print(clientTrelloApi.get_card(id_card))
+    card = clientTrelloApi.get_card(id_card)
+    print(card.name)
+    print(card.desc)
+    print(card.id)
 
     # result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
     # print(result)
