@@ -5,7 +5,8 @@ from trello import TrelloClient
 import requests
 
 from private_config import local_telegram_token, server_telegram_token, list_tech_done_local, list_creo_done_local, \
-    list_tech_done, list_creo_done, idList_creo_test, idList_tech_test, idList_tech, idList_creo, local_api_key_trello, \
+    list_tech_done, list_creo_done, idList_creo_test, idList_tech_test, idList_tech, idList_creo, \
+    local_api_key_trello, \
     local_token_trello, local_secret_trello, server_api_key_trello, server_token_trello, server_secret_trello, \
     local_password_connection, local_name_db, server_password_connection, server_name_db
 
@@ -59,8 +60,16 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.get_json()
+            print(data['action']['data'])
 
-            if data['action']['data']['card']['idList'] in (list_creo, list_tech):
+            try: move_json_model = data['action']['data']['card']['idList']
+            except: move_json_model = ""
+
+            try: create_json_model = data['action']['data']['list']['id']
+            except: create_json_model = ""
+
+            # if card has moved to column (DONE TASK)
+            if move_json_model in (list_creo, list_tech):
                 if data['action']['data']['listBefore']['id'] in (list_from_creo, list_from_tech):
                     card_id = data['action']['data']['card']['id']
                     if data['action']['data']['card']['idList'] == list_tech:
@@ -69,6 +78,11 @@ def webhook_handler():
                         get_card(card_id, "cards_creo")
                 else:
                     print('step2 cancel')
+
+            # if card has moved or create to column (NEW TASK)
+            elif create_json_model == list_from_tech or move_json_model == list_from_tech:
+                card_id = data['action']['data']['card']['id']
+                get_card(card_id, "cards_tech", tech=True)
             else:
                 print('step1 cancel')
         except Exception as e:
@@ -80,13 +94,14 @@ def webhook_handler():
     return 'OK', 200
 
 
-def get_card(id_card, table_name):
+def get_card(id_card, table_name, tech=False):
     card = clientTrelloApi.get_card(id_card)
-    result = get_card_from_db(table_name, id_card)
+    result = get_tech_from_db() if tech else get_card_from_db(table_name, id_card)
     if result is not None:
+        message = "Нова задача 🔨" if tech else "Задача готова ✅"
         jsonDataPass = {
             "chat_id": result,
-            "text": f"{card.name} - Задача готова✅ \n{card.url}"
+            "text": f"{card.name} - {message} \n{card.url}"
         }
         result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
         print(result.status_code)
@@ -105,6 +120,22 @@ def get_card_from_db(table_name, id_card):
             return result
     except Exception as e:
         print(f"get_card_from_db() {e}")
+        return None
+
+
+def get_tech_from_db():
+    try:
+        with connect_db() as connection:
+            with connection.cursor() as cursor:
+                select_user = f"SELECT * FROM `users` WHERE `dep_user` = 'tech';"
+
+                cursor.execute(select_user)
+                result = cursor.fetchall()[0]['id_user']
+
+            connection.commit()
+            return result
+    except Exception as e:
+        print(f"get_tech_from_db() {e}")
         return None
 
 
