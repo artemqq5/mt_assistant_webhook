@@ -60,27 +60,21 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.get_json()
-            # print(data['action'])
+            action = data['action']['display']['translationKey']
 
-            try: move_json_model = data['action']['data']['card']['idList']
-            except: move_json_model = ""
-
-            try: create_json_model = data['action']['data']['list']['id']
-            except: create_json_model = ""
+            print(action)
+            print(data['model']['id'])
 
             # if card has moved to column (DONE TASK)
-            if move_json_model in (list_creo, list_tech):
-                if data['action']['data']['listBefore']['id'] in (list_from_creo, list_from_tech):
-                    card_id = data['action']['data']['card']['id']
-                    if data['action']['data']['card']['idList'] == list_tech:
-                        get_card(card_id, "cards_tech")
-                    else:
-                        get_card(card_id, "cards_creo")
+            if data['model']['id'] in (list_tech, list_creo) and action == "action_move_card_from_list_to_list":
+                card_id = data['action']['data']['card']['id']
+                if data['action']['data']['card']['idList'] == list_tech:
+                    get_card(card_id, "cards_tech")
                 else:
-                    print('step2 cancel')
+                    get_card(card_id, "cards_creo")
 
             # if card has moved or create to column (NEW TASK)
-            elif create_json_model == list_from_tech:
+            elif data['model']['id'] == list_from_tech and action == "action_create_card":
                 card_id = data['action']['data']['card']['id']
                 get_card(card_id, "cards_tech", tech=True)
             else:
