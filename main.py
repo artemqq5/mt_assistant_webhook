@@ -64,16 +64,17 @@ def webhook_handler():
 
             print(action)
             print(data['model']['id'])
+            # print(data)
 
             # if card has moved to column (DONE TASK)
             if data['model']['id'] in (list_tech, list_creo) and action == "action_move_card_from_list_to_list":
                 card_id = data['action']['data']['card']['id']
-                if data['action']['data']['card']['idList'] == list_tech:
+                if data['action']['data']['listAfter']['id'] == list_tech:
                     get_card(card_id, "cards_tech")
-                else:
+                elif data['action']['data']['listAfter']['id'] == list_creo:
                     get_card(card_id, "cards_creo")
 
-            # if card has moved or create to column (NEW TASK)
+            # if card has created in column (NEW TASK)
             elif data['model']['id'] == list_from_tech and action == "action_create_card":
                 card_id = data['action']['data']['card']['id']
                 get_card(card_id, "cards_tech", tech=True)
