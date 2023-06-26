@@ -60,7 +60,7 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.get_json()
-            print(data['action']['data'])
+            # print(data['action'])
 
             try: move_json_model = data['action']['data']['card']['idList']
             except: move_json_model = ""
@@ -80,7 +80,7 @@ def webhook_handler():
                     print('step2 cancel')
 
             # if card has moved or create to column (NEW TASK)
-            elif create_json_model == list_from_tech or move_json_model == list_from_tech:
+            elif create_json_model == list_from_tech:
                 card_id = data['action']['data']['card']['id']
                 get_card(card_id, "cards_tech", tech=True)
             else:
