@@ -94,12 +94,13 @@ def get_card(id_card, table_name, tech=False):
     result = get_tech_from_db() if tech else get_card_from_db(table_name, id_card)
     if result is not None:
         message = "Нова задача 🔨" if tech else "Задача готова ✅"
-        jsonDataPass = {
-            "chat_id": result,
-            "text": f"{card.name} - {message} \n{card.url}"
-        }
-        result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
-        print(result.status_code)
+        for user_id in result:
+            jsonDataPass = {
+                "chat_id": user_id,
+                "text": f"{card.name} - {message} \n{card.url}"
+            }
+            result = requests.request(method='POST', url=URL_MESSAGE, data=jsonDataPass)
+            print(result.status_code)
 
 
 def get_card_from_db(table_name, id_card):
@@ -109,7 +110,7 @@ def get_card_from_db(table_name, id_card):
                 select_card = f"SELECT `id_user` FROM `{table_name}` WHERE `id_card` = '{id_card}';"
 
                 cursor.execute(select_card)
-                result = cursor.fetchall()[0]['id_user']
+                result = [cursor.fetchall()[0]['id_user']]
 
             connection.commit()
             return result
@@ -125,7 +126,12 @@ def get_tech_from_db():
                 select_user = f"SELECT * FROM `users` WHERE `dep_user` = 'tech';"
 
                 cursor.execute(select_user)
-                result = cursor.fetchall()[0]['id_user']
+                result = []
+
+                for i in cursor.fetchall():
+                    result.append(i['id_user'])
+
+                print(f"all tech: {result}")
 
             connection.commit()
             return result
