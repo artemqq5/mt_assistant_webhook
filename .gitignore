@@ -3,3 +3,4 @@ __pycache__/
 venv/
 myvenv/
 private_config.py
+config.txt
