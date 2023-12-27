@@ -14,12 +14,10 @@ if DEBUG_MODE:
     list_tech = list_tech_done_local
     list_creo = list_creo_done_local
     list_from_tech = idList_tech_test
-    list_from_creo_gambling = id_creo_gambling_test
-    list_from_creo_crypto = id_creo_crypto_test
-    list_from_creo_media = id_creo_media_test
-    API_KEY_TRELLO = local_api_key_trello
-    TOKEN_TRELLO = local_token_trello
-    API_SECRET_TRELLO = local_secret_trello
+    list_from_creo = idList_creo_test
+    API_KEY_TRELLO = server_api_key_trello
+    TOKEN_TRELLO = server_token_trello
+    API_SECRET_TRELLO = server_secret_trello
     CONNECTION_PASSWORD = local_password_connection
     DB_NAME = local_name_db
 else:
@@ -27,9 +25,7 @@ else:
     list_tech = list_tech_done
     list_creo = list_creo_done
     list_from_tech = idList_tech
-    list_from_creo_gambling = id_creo_gambling
-    list_from_creo_crypto = id_creo_crypto
-    list_from_creo_media = id_creo_media
+    list_from_creo = idList_creo
     API_KEY_TRELLO = server_api_key_trello
     TOKEN_TRELLO = server_token_trello
     API_SECRET_TRELLO = server_secret_trello
@@ -76,13 +72,20 @@ def webhook_handler():
             elif id_of_list_after == list_tech:
                 print("Done tech")
                 done_task(id_card=card["id"], table_name="cards_tech")
-            elif (id_of_list_after in (list_from_creo_gambling, list_from_creo_crypto, list_from_creo_media)
-                  and action == "action_create_card"):
-                print("Create creo")
-                create_task(id_card=card["id"], dep="designer")
-            elif id_of_list_after in (list_from_tech,) and action == "action_create_card":
-                print("Create tech")
-                create_task(id_card=card["id"], dep="tech")
+            elif id_of_list_after in (list_from_creo,):
+                if action == "action_create_card":
+                    print("Create creo")
+                    create_task(id_card=card["id"], dep="designer", sub_text="Нова задача")
+                else:
+                    print("move to creo new")
+                    create_task(id_card=card["id"], dep="designer", sub_text="Задание вернулось в колонку")
+            elif id_of_list_after in (list_from_tech,):
+                if action == "action_create_card":
+                    print("Create tech")
+                    create_task(id_card=card["id"], dep="tech", sub_text="Нова задача")
+                else:
+                    print("move to tech new")
+                    create_task(id_card=card["id"], dep="tech", sub_text="Задание вернулось в колонку")
             else:
                 print("None")
 
@@ -95,12 +98,12 @@ def webhook_handler():
     return 'OK', 200
 
 
-def create_task(id_card, dep):
+def create_task(id_card, dep, sub_text):
     try:
         card = clientTrelloApi.get_card(id_card)
         users = get_users_from_db(dep)
         for user in users:
-            json_data_pass = {"chat_id": user, "text": f"{card.name} - Нова задача 🔨 \n{card.url}"}
+            json_data_pass = {"chat_id": user, "text": f"{card.name} - {sub_text} 🔨 \n{card.url}"}
             result = requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
             print(result.status_code)
     except Exception as e:
@@ -162,3 +165,4 @@ def get_users_from_db(dep):
 if __name__ == '__main__':
     http_server = WSGIServer(("0.0.0.0", 5000), app)
     http_server.serve_forever()
+    # app.run()
