@@ -16,6 +16,7 @@ app = Flask(__name__)
 
 CHANGE_STATUS_TASK = "action_update_custom_field_item"
 MOVE_TASK = "action_move_card_from_list_to_list"
+COMMENT_TASK = "action_comment_on_card"
 
 TASK_DONE = "on_approve"
 TASK_ACTIVE = "active"
@@ -27,22 +28,34 @@ def webhook_handler():
         try:
             data = request.json
             model = parse_trello_response(data)
+            # print(data)
 
             if model.translationKey == CHANGE_STATUS_TASK:
                 if model.customFieldItemIdValue == COMPLETED_STATUS_TRELLO:
                     print("creo done")
                     status_task = "готово 🟢"
-                    task_change_status(id_card=model.id, table_name='cards_creo', name=model.name, url=model.shortUrl,
-                                       status=status_task)
+                    task_change_status_notify(id_card=model.id, table_name='cards_creo', name=model.name,
+                                              url=model.shortUrl,
+                                              status=status_task)
                 elif model.customFieldItemIdValue == ACTIVE_STATUS_TRELLO:
                     print("creo in active")
                     status_task = "в процесі 🟠️"
-                    task_change_status(id_card=model.id, table_name='cards_creo', name=model.name, url=model.shortUrl,
-                                       status=status_task)
+                    task_change_status_notify(id_card=model.id, table_name='cards_creo', name=model.name,
+                                              url=model.shortUrl,
+                                              status=status_task)
             elif model.translationKey == MOVE_TASK:
                 if model.listAfterId == list_tech_done:
                     print("Задача з tech в Готово")
-                    task_done_(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+                    task_done_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+            elif model.translationKey == COMMENT_TASK:
+                if model.webhook_name == 'Creo':
+                    comment_task_notify(table_name='cards_creo', name=model.name, url=model.shortUrl,
+                                        comment=model.comment)
+
+                elif model.webhook_name == 'Tech':
+                    comment_task_notify(table_name='cards_tech', name=model.name, url=model.shortUrl,
+                                        comment=model.comment)
+
             else:
                 pass
 
@@ -71,6 +84,10 @@ def parse_trello_response(data):
         listAfterId = None
         listAfterText = None
 
+    comment = data['action'].get('data', None)
+    if comment is not None:
+        comment = comment.get('text', None)
+
     return TrelloAction(
         id_=data['model']['id'],
         desc=data['model']['desc'],
@@ -81,40 +98,55 @@ def parse_trello_response(data):
         translationKey=data['action']['display']['translationKey'],
         customFieldItemIdValue=customFieldItemIdValue,
         listAfterId=listAfterId,
-        listAfterText=listAfterText
+        listAfterText=listAfterText,
+        comment=comment,
+        webhook_name=data['webhook']['description'].split("_")[0]
     )
 
 
-def task_done_(id_card, table_name, name, url):
+def task_done_notify(id_card, table_name, name, url):
     try:
         id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        # print(id_user)
         if id_user is not None:
             json_data_pass = {
                 "chat_id": id_user,
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадача позначена як виконана 🟢\n\n{url}"
             }
-            result = requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
-            # print(result.json())
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
     except Exception as e:
-        print(f"done_task(id_card, table_name): {e}")
+        print(f"task_done_notify: {e}")
 
 
-def task_change_status(id_card, table_name, name, url, status):
+def task_change_status_notify(id_card, table_name, name, url, status):
     try:
         id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        # print(id_user)
         if id_user is not None:
             json_data_pass = {
                 "chat_id": id_user,
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадача змінили статус на {status}!\n\n{url}"
             }
-            result = requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
-            # print(result.json())
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
     except Exception as e:
-        print(f"done_task(id_card, table_name): {e}")
+        print(f"task_change_status_notify: {e}")
+
+
+def comment_task_notify(table_name, name, url, comment):
+    try:
+        dep = 'designer' if table_name == 'cards_creo' else 'tech'
+        users = MyDatabase().get_users_by_dep(dep)
+        if users is not None:
+            for user in users:
+                json_data_pass = {
+                    "chat_id": user['id_user'],
+                    "parse_mode": "html",
+                    "text": f"<b>Новий коментар до задачі!</b>\n{name}\n\n{comment}\n\n{url}"
+                }
+                requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+
+    except Exception as e:
+        print(f"comment_task_notify: {e}")
 
 
 # change status card 1
