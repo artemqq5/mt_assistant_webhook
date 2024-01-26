@@ -22,8 +22,11 @@ ADD_NEW_TASK = "action_create_card"
 TASK_DONE = "on_approve"
 TASK_ACTIVE = "active"
 
-# 65ae861ddc34d284de230800 webhok for tech List new task TEST
+# webhok for tech List new task TEST
 # 65ae8a93749840a80db66415 webhok for tech List new task PROD
+
+# webhok for creo List new task TEST
+# 65b3842454c6b836d995d47c webhok for creo List new task TEST
 
 
 @app.route('/webhook', methods=['POST', 'GET'])
@@ -66,10 +69,13 @@ def webhook_handler():
                     comment_task_notify(table_name='cards_tech', name=model.name, url=model.shortUrl,
                                         comment=model.comment)
             # Створили нове завдання з трелло (не через бота) в список технічки
-            elif model.translationKey == ADD_NEW_TASK and model.idList == list_from_tech:
-                if not model.name.startswith('#'):
+            elif model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
+                if model.idList == list_from_tech:
                     print("tech new task add from trello (no bot)")
                     new_task_no_bot(table_name='cards_tech',  name=model.name, url=model.shortUrl)
+                elif model.idList == list_from_creo:
+                    print("creo new task add from trello (no bot)")
+                    new_task_no_bot(table_name='cards_creo', name=model.name, url=model.shortUrl)
 
             # Інша операція
             else:
