@@ -3,3 +3,4 @@ __pycache__/
 venv/
 myvenv/
 cfg/private_config.py
+.DS_Store
