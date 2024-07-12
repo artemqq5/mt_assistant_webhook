@@ -7,8 +7,7 @@ from gevent.pywsgi import WSGIServer
 from trello import TrelloClient
 import requests
 
-from cfg.config import API_KEY_TRELLO, API_SECRET_TRELLO, TOKEN_TRELLO, CONNECTION_PASSWORD, DB_NAME, list_from_creo, \
-    list_from_tech, URL_MESSAGE, COMPLETED_STATUS_TRELLO, ACTIVE_STATUS_TRELLO, list_tech_done
+from cfg.config import *
 from repository.database_ import MyDatabase
 from repository.trello_ import TrelloAction
 
@@ -21,6 +20,7 @@ ADD_NEW_TASK = "action_create_card"
 
 TASK_DONE = "on_approve"
 TASK_ACTIVE = "active"
+
 
 # webhok for tech List new task TEST
 # 65ae8a93749840a80db66415 webhok for tech List new task PROD
@@ -53,10 +53,18 @@ def webhook_handler():
                                               url=model.shortUrl,
                                               status=status_task)
             # перемістили завдання в колонку готово (технічка)
-            elif model.translationKey == MOVE_TASK:
-                if model.listAfterId == list_tech_done:
-                    print("перемістили завдання в колонку готово (технічка)")
-                    task_done_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+            elif model.translationKey == MOVE_TASK and model.listAfterId == list_tech_done:
+                print("перемістили завдання в колонку готово (технічка)")
+                task_done_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+            # перемістили завдання в колонку в процессі (технічка)
+            elif model.translationKey == MOVE_TASK and model.listAfterId == list_tech_proccess:
+                print("перемістили завдання в колонку в процесі (технічка)")
+                task_in_proccess_notify(id_card=model.id, table_name='cards_tech', name=model.name,
+                                        url=model.shortUrl)
+            # перемістили завдання в колонку new (технічка)
+            elif model.translationKey == MOVE_TASK and (model.listAfterId == list_tech_gleb or model.listAfterId == list_tech_egor):
+                print("перемістили завдання в колонку new (технічка)")
+                task_wait_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
             # Залишили коммент до завдання в трелло
             elif model.translationKey == COMMENT_TASK:
                 if model.webhook_name == 'Creo':
@@ -70,12 +78,15 @@ def webhook_handler():
                                         comment=model.comment)
             # Створили нове завдання з трелло (не через бота) в список технічки
             elif model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
-                if model.idList == list_from_tech:
-                    print("tech new task add from trello (no bot)")
-                    new_task_no_bot(table_name='cards_tech',  name=model.name, url=model.shortUrl)
+                if model.idList == list_tech_gleb:
+                    print("tech new task add from trello gleb (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=GLEB_ID)
+                elif model.idList == list_tech_egor:
+                    print("tech new task add from trello egor (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=EGOR_ID)
                 elif model.idList == list_from_creo:
                     print("creo new task add from trello (no bot)")
-                    new_task_no_bot(table_name='cards_creo', name=model.name, url=model.shortUrl)
+                    new_task_no_bot_creo(name=model.name, url=model.shortUrl)
 
             # Інша операція
             else:
@@ -147,6 +158,34 @@ def task_done_notify(id_card, table_name, name, url):
         print(f"task_done_notify: {e}")
 
 
+def task_in_proccess_notify(id_card, table_name, name, url):
+    try:
+        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        if id_user is not None:
+            json_data_pass = {
+                "chat_id": id_user,
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадачу щойно взяли у роботу 🟠\n\n{url}"
+            }
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+    except Exception as e:
+        print(f"task_in_proccess_notify: {e}")
+
+
+def task_wait_notify(id_card, table_name, name, url):
+    try:
+        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        if id_user is not None:
+            json_data_pass = {
+                "chat_id": id_user,
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадачу щойно перемістили у список очікування 🟡\n\n{url}"
+            }
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+    except Exception as e:
+        print(f"task_wait_notify: {e}")
+
+
 def task_change_status_notify(id_card, table_name, name, url, status):
     try:
         id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
@@ -178,10 +217,10 @@ def comment_task_notify(table_name, name, url, comment):
         print(f"comment_task_notify: {e}")
 
 
-def new_task_no_bot(table_name, name, url):
+def new_task_no_bot_creo(name, url):
     try:
-        dep = 'designer' if table_name == 'cards_creo' else 'tech'
-        users = MyDatabase().get_users_by_dep(dep)
+        dep = 'designer'
+        users = MyDatabase().get_users_by_dep(dep) + MyDatabase().get_users_by_dep("admin")
         if users is not None:
             for user in users:
                 json_data_pass = {
@@ -192,7 +231,23 @@ def new_task_no_bot(table_name, name, url):
                 requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
 
     except Exception as e:
-        print(f"new_task_no_bot: {e}")
+        print(f"new_task_no_bot creo: {e}")
+
+
+def new_task_no_bot_tech(name, url, id_user):
+    try:
+        users = [user['id_user'] for user in MyDatabase().get_users_by_dep("admin")] + [id_user]
+        if users is not None:
+            for user in users:
+                json_data_pass = {
+                    "chat_id": user,
+                    "parse_mode": "html",
+                    "text": f"<b>Нова задача! (поставлена не через бот)</b>\n{name}\n\n{url}"
+                }
+                requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+
+    except Exception as e:
+        print(f"new_task_no_bot tech: {e}")
 
 #
 
@@ -220,6 +275,6 @@ def new_task_no_bot(table_name, name, url):
 
 
 if __name__ == '__main__':
-    http_server = WSGIServer(("0.0.0.0", 5000), app)
-    http_server.serve_forever()
-    # app.run()
+    # http_server = WSGIServer(("0.0.0.0", 5000), app)
+    # http_server.serve_forever()
+    app.run()

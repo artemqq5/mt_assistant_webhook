@@ -16,6 +16,10 @@ if DEBUG_MODE:
     list_from_tech = idList_tech_test
     list_from_creo = idList_creo_test
 
+    list_tech_gleb = list_tech_gleb_test
+    list_tech_egor = list_tech_egor_test
+    list_tech_proccess = list_tech_proccess_test
+
     API_KEY_TRELLO = server_api_key_trello
     TOKEN_TRELLO = server_token_trello
     API_SECRET_TRELLO = server_secret_trello
@@ -37,10 +41,13 @@ else:
     list_from_tech = idList_tech
     list_from_creo = idList_creo
 
+    list_tech_gleb = list_tech_gleb_server
+    list_tech_egor = list_tech_egor_server
+    list_tech_proccess = list_tech_proccess_server
+
     API_KEY_TRELLO = server_api_key_trello
     TOKEN_TRELLO = server_token_trello
     API_SECRET_TRELLO = server_secret_trello
 
     COMPLETED_STATUS_TRELLO = SERVER_COMPLETED_STATUS_TRELLO
     ACTIVE_STATUS_TRELLO = SERVER_ACTIVE_STATUS_TRELLO
-
