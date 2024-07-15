@@ -1,164 +1,290 @@
+import json
+import re
+
 import pymysql
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 from trello import TrelloClient
 import requests
 
-from config import DEBUG_MODE
-from private_config import *
+from cfg.config import *
+from repository.database_ import MyDatabase
+from repository.trello_ import TrelloAction
 
 app = Flask(__name__)
 
-if DEBUG_MODE:
-    URL_MESSAGE = f"https://api.telegram.org/bot{local_telegram_token}/sendMessage"
-    list_tech = list_tech_done_local
-    list_creo = list_creo_done_local
-    list_from_tech = idList_tech_test
-    list_from_creo_gambling = id_creo_gambling_test
-    list_from_creo_crypto = id_creo_crypto_test
-    list_from_creo_media = id_creo_media_test
-    API_KEY_TRELLO = local_api_key_trello
-    TOKEN_TRELLO = local_token_trello
-    API_SECRET_TRELLO = local_secret_trello
-    CONNECTION_PASSWORD = local_password_connection
-    DB_NAME = local_name_db
-else:
-    URL_MESSAGE = f"https://api.telegram.org/bot{server_telegram_token}/sendMessage"
-    list_tech = list_tech_done
-    list_creo = list_creo_done
-    list_from_tech = idList_tech
-    list_from_creo_gambling = id_creo_gambling
-    list_from_creo_crypto = id_creo_crypto
-    list_from_creo_media = id_creo_media
-    API_KEY_TRELLO = server_api_key_trello
-    TOKEN_TRELLO = server_token_trello
-    API_SECRET_TRELLO = server_secret_trello
-    CONNECTION_PASSWORD = server_password_connection
-    DB_NAME = server_name_db
+CHANGE_STATUS_TASK = "action_update_custom_field_item"
+MOVE_TASK = "action_move_card_from_list_to_list"
+COMMENT_TASK = "action_comment_on_card"
+ADD_NEW_TASK = "action_create_card"
 
-clientTrelloApi = TrelloClient(
-    api_key=API_KEY_TRELLO,
-    api_secret=API_SECRET_TRELLO,
-    token=TOKEN_TRELLO
-)
+WEBHOOK_TECH="TechNew"
+
+TASK_DONE = "on_approve"
+TASK_ACTIVE = "active"
 
 
-def connect_db():
-    return pymysql.connect(
-        host="localhost",
-        user="root",
-        password=CONNECTION_PASSWORD,
-        db=DB_NAME,
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor
-    )
+# webhok for tech List new task TEST
+# 65ae8a93749840a80db66415 webhok for tech List new task PROD
+
+# webhok for creo List new task TEST
+# 65b3842454c6b836d995d47c webhok for creo List new task TEST
 
 
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook_handler():
     if request.method == 'POST':
         try:
-            data = request.get_json()
-            action = data['action']['display']['translationKey']
-            card = data['action']['display']['entities']['card']
-            list_after = data['action']['display']['entities'].get('list') if 'list' in data['action']['display'][
-                'entities'] else data['action']['display']['entities'].get('listAfter')
+            data = request.json
+            # print(data)
+            model = parse_trello_response(data)
+            print(str(model))
 
-            id_of_list_after = list_after['id']
+            # Створили нове завдання з трелло (не через бота) в список технічки
+            if model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
 
-            print(f"{data}\n\n\n\n")
-            print(f"{action}\n\n")
-            print(f"{list_after}\n\n")
+                if model.idList == list_tech_gleb:
+                    print("tech new task add from trello gleb (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=GLEB_ID)
+                elif model.idList == list_tech_egor:
+                    print("tech new task add from trello egor (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=EGOR_ID)
+                elif model.idList == list_from_creo:
+                    print("creo new task add from trello (no bot)")
+                    new_task_no_bot_creo(name=model.name, url=model.shortUrl)
+            elif model.webhook_name == WEBHOOK_TECH:
+                print(f"Double webhook from: {model.webhook_name} was skipped")
+                return "Error", 400
+            # змінили статус завданню на дошці CREO
+            elif model.translationKey == CHANGE_STATUS_TASK:
+                if model.customFieldItemIdValue == COMPLETED_STATUS_TRELLO:
+                    print("змінили статус завданню на дошці CREO -> creo done")
+                    status_task = "готово 🟢"
+                    task_change_status_notify(id_card=model.id, table_name='cards_creo', name=model.name,
+                                              url=model.shortUrl,
+                                              status=status_task)
+                elif model.customFieldItemIdValue == ACTIVE_STATUS_TRELLO:
+                    print("змінили статус завданню на дошці CREO -> creo active")
+                    status_task = "в процесі 🟠️"
+                    task_change_status_notify(id_card=model.id, table_name='cards_creo', name=model.name,
+                                              url=model.shortUrl,
+                                              status=status_task)
+            # перемістили завдання в колонку готово (технічка)
+            elif model.translationKey == MOVE_TASK and model.listAfterId == list_tech_done:
+                print("перемістили завдання в колонку готово (технічка)")
+                task_done_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+            # перемістили завдання в колонку в процессі (технічка)
+            elif model.translationKey == MOVE_TASK and model.listAfterId == list_tech_proccess:
+                print("перемістили завдання в колонку в процесі (технічка)")
+                task_in_proccess_notify(id_card=model.id, table_name='cards_tech', name=model.name,
+                                        url=model.shortUrl)
+            # перемістили завдання в колонку new (технічка)
+            elif model.translationKey == MOVE_TASK and (model.listAfterId == list_tech_gleb or model.listAfterId == list_tech_egor):
+                print("перемістили завдання в колонку new (технічка)")
+                task_wait_notify(id_card=model.id, table_name='cards_tech', name=model.name, url=model.shortUrl)
+            # Залишили коммент до завдання в трелло
+            elif model.translationKey == COMMENT_TASK:
+                if model.webhook_name == 'Creo':
+                    print("Залишили коммент до завдання в трелло (creo)")
+                    comment_task_notify(table_name='cards_creo', name=model.name, url=model.shortUrl,
+                                        comment=model.comment)
 
-            if id_of_list_after == list_creo:
-                print("Done creo")
-                done_task(id_card=card["id"], table_name="cards_creo")
-            elif id_of_list_after == list_tech:
-                print("Done tech")
-                done_task(id_card=card["id"], table_name="cards_tech")
-            elif (id_of_list_after in (list_from_creo_gambling, list_from_creo_crypto, list_from_creo_media)
-                  and action == "action_create_card"):
-                print("Create creo")
-                create_task(id_card=card["id"], dep="designer")
-            elif id_of_list_after in (list_from_tech,) and action == "action_create_card":
-                print("Create tech")
-                create_task(id_card=card["id"], dep="tech")
+                elif model.webhook_name == 'Tech':
+                    print("Залишили коммент до завдання в трелло (технічка)")
+                    comment_task_notify(table_name='cards_tech', name=model.name, url=model.shortUrl,
+                                        comment=model.comment)
+            # Інша операція
             else:
-                print("None")
+                print("none model")
 
         except Exception as e:
-            print("exception when getting data POST")
-            print(f"exception {e}")
+            print(f"error: {e}")
     else:
-        print("get request success GET")
+        print("GET")
 
-    return 'OK', 200
+    return "OK", 200
 
 
-def create_task(id_card, dep):
+def parse_trello_response(data):
+    # Безпечне отримання значень з використанням get()
+    customFieldItem = data.get('action', {}).get('data', {}).get('customFieldItem')
+
+    # Ініціалізація змінних з перевіркою на None
+    customFieldItemIdValue = customFieldItem.get('idValue', None) if customFieldItem else None
+
+    listAfter = data.get('action', {}).get('data', {}).get('listAfter')
+    listAfterId = listAfter.get('id', None) if listAfter else None
+    listAfterText = listAfter.get('name', None) if listAfter else None
+
+    commentData = data.get('action', {}).get('data', {})
+    comment = commentData.get('text', None) if commentData else None
+
+    model = data.get('model', {})
+    id_ = data.get('action', {}).get('data', {}).get('card', {}).get('id', None)
+    print(data.get('action', {}).get('data', {}).get('card', {}))
+    desc = model.get('desc', None)
+    idBoard = model.get('idBoard', None)
+    idList = data.get('action', {}).get('display', {}).get("entities", {}).get("list", {}).get("id", {})
+    name = data.get('action', {}).get('data', {}).get('card', {}).get('name', None)
+    shortUrl = data.get('action', {}).get('data', {}).get('card', {}).get('shortLink', None)
+
+    actionDisplay = data.get('action', {}).get('display', {})
+    translationKey = actionDisplay.get('translationKey', None)
+
+    webhookData = data.get('webhook', {})
+    webhookName = webhookData.get('description', '').split("_")[0] if webhookData else None
+
+    return TrelloAction(
+        id_=id_,
+        desc=desc,
+        idBoard=idBoard,
+        idList=idList,
+        name=name,
+        shortUrl=f"https://trello.com/c/{shortUrl}",
+        translationKey=translationKey,
+        customFieldItemIdValue=customFieldItemIdValue,
+        listAfterId=listAfterId,
+        listAfterText=listAfterText,
+        comment=comment,
+        webhook_name=webhookName
+    )
+
+
+def task_done_notify(id_card, table_name, name, url):
     try:
-        card = clientTrelloApi.get_card(id_card)
-        users = get_users_from_db(dep)
-        for user in users:
-            json_data_pass = {"chat_id": user, "text": f"{card.name} - Нова задача 🔨 \n{card.url}"}
-            result = requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
-            print(result.status_code)
-    except Exception as e:
-        print(f"create_task(id_card, table_name): {e}")
-
-
-def done_task(id_card, table_name):
-    try:
-        card = clientTrelloApi.get_card(id_card)
-        result = get_card_from_db(table_name, id_card)
-        if result is not None:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
             json_data_pass = {
-                "chat_id": result[0],
-                "text": f"{card.name} - Задачу виконано 👌 \n{card.url}"
+                "chat_id": user['id_user'],
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадача позначена як виконана 🟢\n\n{url}"
             }
-            result = requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
-            print(result.status_code)
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
     except Exception as e:
-        print(f"done_task(id_card, table_name): {e}")
+        print(f"task_done_notify: {e}")
 
 
-def get_card_from_db(table_name, id_card):
+def task_in_proccess_notify(id_card, table_name, name, url):
     try:
-        with connect_db() as connection:
-            with connection.cursor() as cursor:
-                select_card = f"SELECT `id_user` FROM `{table_name}` WHERE `id_card` = '{id_card}';"
-
-                cursor.execute(select_card)
-                result = [cursor.fetchall()[0]['id_user']]
-
-            connection.commit()
-            return result
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
+            json_data_pass = {
+                "chat_id": user['id_user'],
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадачу щойно взяли у роботу 🟠\n\n{url}"
+            }
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
     except Exception as e:
-        print(f"get_card_from_db() {e}")
-        return None
+        print(f"task_in_proccess_notify: {e}")
 
 
-def get_users_from_db(dep):
+def task_wait_notify(id_card, table_name, name, url):
     try:
-        with connect_db() as connection:
-            with connection.cursor() as cursor:
-                select_user = f"SELECT * FROM `users` WHERE `dep_user` = '{dep}';"
-
-                cursor.execute(select_user)
-                result = []
-
-                for i in cursor.fetchall():
-                    result.append(i['id_user'])
-
-                print(f"all users {dep}: {result}")
-
-            connection.commit()
-            return result
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
+            json_data_pass = {
+                "chat_id": user['id_user'],
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадачу щойно перемістили у список очікування 🟡\n\n{url}"
+            }
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
     except Exception as e:
-        print(f"get_users_from_db() {e}")
-        return None
+        print(f"task_wait_notify: {e}")
+
+
+def task_change_status_notify(id_card, table_name, name, url, status):
+    try:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        if user is not None:
+            json_data_pass = {
+                "chat_id": user['id_user'],
+                "parse_mode": "html",
+                "text": f"<b>{name}</b>\n\nЗадача змінили статус на {status}!\n\n{url}"
+            }
+            requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+    except Exception as e:
+        print(f"task_change_status_notify: {e}")
+
+
+def comment_task_notify(table_name, name, url, comment):
+    try:
+        dep = 'designer' if table_name == 'cards_creo' else 'tech'
+        users = MyDatabase().get_users_by_dep(dep)
+        if users is not None:
+            for user in users:
+                json_data_pass = {
+                    "chat_id": user['id_user'],
+                    "parse_mode": "html",
+                    "text": f"<b>Новий коментар до задачі!</b>\n{name}\n\n{comment}\n\n{url}"
+                }
+                requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+
+    except Exception as e:
+        print(f"comment_task_notify: {e}")
+
+
+def new_task_no_bot_creo(name, url):
+    try:
+        dep = 'designer'
+        users = MyDatabase().get_users_by_dep(dep) + MyDatabase().get_users_by_dep("admin")
+        if users is not None:
+            for user in users:
+                json_data_pass = {
+                    "chat_id": user['id_user'],
+                    "parse_mode": "html",
+                    "text": f"<b>Нова задача! (поставлена не через бот)</b>\n{name}\n\n{url}"
+                }
+                requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+
+    except Exception as e:
+        print(f"new_task_no_bot creo: {e}")
+
+
+def new_task_no_bot_tech(name, url, id_user):
+    try:
+        users = [user['id_user'] for user in MyDatabase().get_users_by_dep("admin")] + [id_user]
+        print(users)
+        if users is not None:
+            for user in users:
+                json_data_pass = {
+                    "chat_id": user,
+                    "parse_mode": "html",
+                    "text": f"<b>Нова задача! (поставлена не через бот)</b>\n{name}\n\n{url}"
+                }
+                requests.request(method='POST', url=URL_MESSAGE, data=json_data_pass)
+
+    except Exception as e:
+        print(f"new_task_no_bot tech: {e}")
+
+#
+
+
+# change status card 1
+# 'id': '659d6bfe39ed5284f27144fb'
+# 'desc': 'offers_name: test\ndesc: test\n\nusername: @artem\ntelegram id: 886327182\n'
+# 'idBoard': '657349bfd5dd7da8739e6058'
+# 'idList': '658bdfb79109634c42cdfb7c'
+# 'name': '#108 Припаркувати домен 🅿️'
+# 'shortUrl': 'https://trello.com/c/CpS48Ca3'
+# 'customFieldItem': 'idValue': '65734c7eeed58843d579f08a'
+# 'name': 'TEST FOR DEVELOPMENT BOT'
+# 'display': {'translationKey': 'action_update_custom_field_item',
+
+# move card 1
+# {'model': {'id': '659d6bfe39ed5284f27144fb',
+# 'desc': 'offers_name: test\ndesc: test\n\nusername: @artem\ntelegram id: 886327182\n',
+# 'idBoard': '657349bfd5dd7da8739e6058',
+# 'idList': '658be90aa17b85c39e0bb722',
+# 'name': '#108 Припаркувати домен 🅿️',
+# shortUrl': 'https://trello.com/c/CpS48Ca3',
+# 'display': {'translationKey': 'action_moved_card_higher', action_moved_card_lower action_move_card_from_list_to_list
+# 'listAfter': {'type': 'list', 'id': '658be90aa17b85c39e0bb722', 'text': 'DONE TECH'}
 
 
 if __name__ == '__main__':
     http_server = WSGIServer(("0.0.0.0", 5000), app)
     http_server.serve_forever()
+    # app.run()
