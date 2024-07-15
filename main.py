@@ -18,6 +18,8 @@ MOVE_TASK = "action_move_card_from_list_to_list"
 COMMENT_TASK = "action_comment_on_card"
 ADD_NEW_TASK = "action_create_card"
 
+WEBHOOK_TECH="TechNew"
+
 TASK_DONE = "on_approve"
 TASK_ACTIVE = "active"
 
@@ -34,12 +36,27 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.json
-            print(data)
+            # print(data)
             model = parse_trello_response(data)
             print(str(model))
 
+            # Створили нове завдання з трелло (не через бота) в список технічки
+            if model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
+
+                if model.idList == list_tech_gleb:
+                    print("tech new task add from trello gleb (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=GLEB_ID)
+                elif model.idList == list_tech_egor:
+                    print("tech new task add from trello egor (no bot)")
+                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=EGOR_ID)
+                elif model.idList == list_from_creo:
+                    print("creo new task add from trello (no bot)")
+                    new_task_no_bot_creo(name=model.name, url=model.shortUrl)
+            elif model.webhook_name == WEBHOOK_TECH:
+                print(f"Double webhook from: {model.webhook_name} was skipped")
+                return "Error", 400
             # змінили статус завданню на дошці CREO
-            if model.translationKey == CHANGE_STATUS_TASK:
+            elif model.translationKey == CHANGE_STATUS_TASK:
                 if model.customFieldItemIdValue == COMPLETED_STATUS_TRELLO:
                     print("змінили статус завданню на дошці CREO -> creo done")
                     status_task = "готово 🟢"
@@ -76,18 +93,6 @@ def webhook_handler():
                     print("Залишили коммент до завдання в трелло (технічка)")
                     comment_task_notify(table_name='cards_tech', name=model.name, url=model.shortUrl,
                                         comment=model.comment)
-            # Створили нове завдання з трелло (не через бота) в список технічки
-            elif model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
-                if model.idList == list_tech_gleb:
-                    print("tech new task add from trello gleb (no bot)")
-                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=GLEB_ID)
-                elif model.idList == list_tech_egor:
-                    print("tech new task add from trello egor (no bot)")
-                    new_task_no_bot_tech(name=model.name, url=model.shortUrl, id_user=EGOR_ID)
-                elif model.idList == list_from_creo:
-                    print("creo new task add from trello (no bot)")
-                    new_task_no_bot_creo(name=model.name, url=model.shortUrl)
-
             # Інша операція
             else:
                 print("none model")
@@ -115,9 +120,8 @@ def parse_trello_response(data):
     comment = commentData.get('text', None) if commentData else None
 
     model = data.get('model', {})
-    id_ = data.get('action', {}).get('card', {}).get('id', None)
-    print(data.get('action', {}))
-    print(data.get('action', {}).get('card', {}))
+    id_ = data.get('action', {}).get('data', {}).get('card', {}).get('id', None)
+    print(data.get('action', {}).get('data', {}).get('card', {}))
     desc = model.get('desc', None)
     idBoard = model.get('idBoard', None)
     idList = data.get('action', {}).get('display', {}).get("entities", {}).get("list", {}).get("id", {})
@@ -242,6 +246,7 @@ def new_task_no_bot_creo(name, url):
 def new_task_no_bot_tech(name, url, id_user):
     try:
         users = [user['id_user'] for user in MyDatabase().get_users_by_dep("admin")] + [id_user]
+        print(users)
         if users is not None:
             for user in users:
                 json_data_pass = {
@@ -280,6 +285,6 @@ def new_task_no_bot_tech(name, url, id_user):
 
 
 if __name__ == '__main__':
-    # http_server = WSGIServer(("0.0.0.0", 5000), app)
-    # http_server.serve_forever()
-    app.run()
+    http_server = WSGIServer(("0.0.0.0", 5000), app)
+    http_server.serve_forever()
+    # app.run()
