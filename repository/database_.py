@@ -20,10 +20,10 @@ class MyDatabase:
         try:
             with self._connection as connection:
                 with connection.cursor() as cursor:
-                    select_card = f"SELECT `id_user` FROM `{table_name}` WHERE `id_card` = %s;"
-
-                    cursor.execute(select_card, id_card)
-                    return cursor.fetchone()['id_user']
+                    select_card = f"SELECT * FROM `{table_name}` WHERE `id_card` = %s;"
+                    print(select_card)
+                    cursor.execute(select_card, (id_card,))
+                    return cursor.fetchone()
         except Exception as e:
             print(f"get_id_user_by_card_id() {e}")
             return None

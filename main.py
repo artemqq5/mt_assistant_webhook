@@ -34,7 +34,7 @@ def webhook_handler():
     if request.method == 'POST':
         try:
             data = request.json
-            # print(data)
+            print(data)
             model = parse_trello_response(data)
             print(str(model))
 
@@ -115,7 +115,9 @@ def parse_trello_response(data):
     comment = commentData.get('text', None) if commentData else None
 
     model = data.get('model', {})
-    id_ = model.get('id', None)
+    id_ = data.get('action', {}).get('card', {}).get('id', None)
+    print(data.get('action', {}))
+    print(data.get('action', {}).get('card', {}))
     desc = model.get('desc', None)
     idBoard = model.get('idBoard', None)
     idList = data.get('action', {}).get('display', {}).get("entities", {}).get("list", {}).get("id", {})
@@ -146,10 +148,11 @@ def parse_trello_response(data):
 
 def task_done_notify(id_card, table_name, name, url):
     try:
-        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        if id_user is not None:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
             json_data_pass = {
-                "chat_id": id_user,
+                "chat_id": user['id_user'],
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадача позначена як виконана 🟢\n\n{url}"
             }
@@ -160,10 +163,11 @@ def task_done_notify(id_card, table_name, name, url):
 
 def task_in_proccess_notify(id_card, table_name, name, url):
     try:
-        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        if id_user is not None:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
             json_data_pass = {
-                "chat_id": id_user,
+                "chat_id": user['id_user'],
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадачу щойно взяли у роботу 🟠\n\n{url}"
             }
@@ -174,10 +178,11 @@ def task_in_proccess_notify(id_card, table_name, name, url):
 
 def task_wait_notify(id_card, table_name, name, url):
     try:
-        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        if id_user is not None:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        print(user)
+        if user is not None:
             json_data_pass = {
-                "chat_id": id_user,
+                "chat_id": user['id_user'],
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадачу щойно перемістили у список очікування 🟡\n\n{url}"
             }
@@ -188,10 +193,10 @@ def task_wait_notify(id_card, table_name, name, url):
 
 def task_change_status_notify(id_card, table_name, name, url, status):
     try:
-        id_user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
-        if id_user is not None:
+        user = MyDatabase().get_id_user_by_card_id(table_name, id_card)
+        if user is not None:
             json_data_pass = {
-                "chat_id": id_user,
+                "chat_id": user['id_user'],
                 "parse_mode": "html",
                 "text": f"<b>{name}</b>\n\nЗадача змінили статус на {status}!\n\n{url}"
             }
