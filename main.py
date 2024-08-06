@@ -40,6 +40,9 @@ def webhook_handler():
             model = parse_trello_response(data)
             print(str(model))
 
+            print(model.translationKey == CHANGE_STATUS_TASK)
+            print(model.customFieldItemIdValue == COMPLETED_STATUS_TRELLO)
+
             # Створили нове завдання з трелло (не через бота) в список технічки
             if model.translationKey == ADD_NEW_TASK and not model.name.startswith('#'):
 
@@ -121,7 +124,6 @@ def parse_trello_response(data):
 
     model = data.get('model', {})
     id_ = data.get('action', {}).get('data', {}).get('card', {}).get('id', None)
-    print(data.get('action', {}).get('data', {}).get('card', {}))
     desc = model.get('desc', None)
     idBoard = model.get('idBoard', None)
     idList = data.get('action', {}).get('display', {}).get("entities", {}).get("list", {}).get("id", {})
@@ -285,6 +287,6 @@ def new_task_no_bot_tech(name, url, id_user):
 
 
 if __name__ == '__main__':
-    http_server = WSGIServer(("0.0.0.0", 5000), app)
-    http_server.serve_forever()
-    # app.run()
+    # http_server = WSGIServer(("0.0.0.0", 5000), app)
+    # http_server.serve_forever()
+    app.run()
