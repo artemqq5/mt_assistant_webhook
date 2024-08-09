@@ -1,6 +1,5 @@
-from wsgiref.simple_server import WSGIServer
-
 from flask import Flask, request
+from gevent.pywsgi import WSGIServer
 
 from private_config import *
 from private_config import GLEB_ID, EGOR_ID, ID_LIST_TECH_GLEB, ID_LIST_TECH_EGOR, ID_LIST_TECH_NEW, ID_LIST_CREO_NEW, \
