@@ -1,3 +1,5 @@
+from wsgiref.simple_server import WSGIServer
+
 from flask import Flask, request
 
 from private_config import *
@@ -149,6 +151,6 @@ def webhook_handler():
 
 
 if __name__ == '__main__':
-    # http_server = WSGIServer(("0.0.0.0", 5000), app)
-    # http_server.serve_forever()
-    app.run()
+    http_server = WSGIServer(("0.0.0.0", 5000), app)
+    http_server.serve_forever()
+    # app.run()
